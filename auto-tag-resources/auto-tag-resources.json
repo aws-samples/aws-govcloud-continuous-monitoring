@@ -1,0 +1,185 @@
+{
+  "Parameters": {
+    "pSupportingFilesBucket": {
+      "Type": "String"
+    },
+    "pSupportingFilesPrefix": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "CreateTagsLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "create-tags-policy"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:CreateTags",
+                    "ec2:Describe*",
+                    "s3:PutBucketTagging",
+                    "s3:GetBucketTagging",
+                    "rds:AddTagsToResource",
+                    "rds:ListTagsForResource"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "create-tags-role"
+            ]
+          ]
+        }
+      }
+    },
+    "CreateTagsEventRule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Description": "Identify Untagged Resources",
+        "EventPattern": {
+          "source": [
+            "aws.ec2",
+            "aws.s3",
+            "aws.rds"
+          ],
+          "detail-type": [
+            "AWS API Call via CloudTrail"
+          ],
+          "detail": {
+            "eventSource": [
+              "ec2.amazonaws.com",
+              "s3.amazonaws.com",
+              "rds.amazonaws.com"
+            ],
+            "eventName": [
+              "RunInstances",
+              "CreateBucket",
+              "CreateDBInstance"
+            ]
+          }
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "CreateTagsLambdaFunction",
+                "Arn"
+              ]
+            },
+            "Id": "identify-untagged-resources"
+          }
+        ]
+      }
+    },
+    "CreateTagsLambdaInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "CreateTagsLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "CreateTagsEventRule",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "CreateTagsLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Handler": "index.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "CreateTagsLambdaRole",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "create-tags"
+            ]
+          ]
+        },
+        "Code": {
+          "S3Bucket": {
+            "Ref": "pSupportingFilesBucket"
+          },
+          "S3Key": {
+            "Fn::Join": [
+              "",
+              [
+                {
+                  "Ref": "pSupportingFilesPrefix"
+                },
+                "auto-tag-resources.zip"
+              ]
+            ]
+          }
+        },
+        "Runtime": "python3.6",
+        "Timeout": 60
+      }
+    }
+  }
+}

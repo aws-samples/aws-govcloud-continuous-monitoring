@@ -1,0 +1,912 @@
+{
+  "Parameters": {
+    "pInfrastructureStackTemplate": {
+      "Type": "String",
+      "Description": "CloudFormation template for Infrastructure child stack"
+    },
+    "pNotificationEmail": {
+      "Type": "String"
+    },
+    "pAllowedBastionCidrBlock": {
+      "Type": "String",
+      "Description": "IP Range allowed for connections to Bastion"
+    }
+  },
+  "Resources": {
+    "rPersistInfrastructureValuesRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaENIManagementAccess"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "persist-infrastructure-values-policy"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:DescribeLogStreams"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:Describe*",
+                    "cloudformation:Describe*",
+                    "kms:*"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "rSecurityGroupsDescriptionTable",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "persist-infrastructure-values-role"
+            ]
+          ]
+        }
+      }
+    },
+    "rPersistInfrastructureValuesInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "rPersistInfrastructureValuesFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "sns.amazonaws.com",
+        "SourceArn": {
+          "Ref": "rInfrastructureEventsTopic"
+        }
+      }
+    },
+    "rPersistInfrastructureValuesFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Handler": "index.lambda_handler",
+        "FunctionName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "persist-infrastructure-values"
+            ]
+          ]
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "rPersistInfrastructureValuesRole",
+            "Arn"
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "DYNAMODB_TABLE": {
+              "Ref": "rSecurityGroupsDescriptionTable"
+            }
+          }
+        },
+        "Code": {
+          "ZipFile": {
+            "Fn::Join": [
+              "\n",
+              [
+                "import json",
+                "import boto3",
+                "import os",
+                "import logging",
+                "",
+                "def lambda_handler(event, context):",
+                "    # configure logging",
+                "    logging.basicConfig(level=logging.DEBUG)",
+                "    logger=logging.getLogger(__name__)",
+                "    logger.setLevel(logging.DEBUG)",
+                "",
+                "    # set boto clients",
+                "    dynamodb_client = boto3.client('dynamodb')",
+                "    ec2_client = boto3.client('ec2')",
+                "    cf_client = boto3.client('cloudformation')",
+                "",
+                "    # get values from event parameter",
+                "    logger.debug(json.dumps(event))",
+                "    ",
+                "    stack_resource_id = ''",
+                "    for i in event['Records']:",
+                "        try:",
+                "            # logger.debug(i['Sns']['Message'])",
+                "            # if ((CREATE_COMPLETE or UPDATE_COMPLETE) and CloudFormation::Stack), update dynamodb",
+                "            # otherwise do nothing",
+                "            if (",
+                "                (",
+                "                    ('ResourceStatus=\\'CREATE_COMPLETE\\'' in i['Sns']['Message']) ",
+                "                    or ",
+                "                    ('ResourceStatus=\\'UPDATE_COMPLETE\\'' in i['Sns']['Message'])",
+                "                )",
+                "                and",
+                "                ('ResourceType=\\'AWS::CloudFormation::Stack\\'' in i['Sns']['Message'])",
+                "                ):",
+                "                # SNS message is not JSON, so we need to parse it line by line",
+                "                split_message = (i['Sns']['Message']).split('\\n')",
+                "                for line in split_message:",
+                "                    # cover the case of a newline with no content",
+                "                    if len(line):",
+                "                        # separate the key from the value using the '='",
+                "                        (key,value) = line.split('=')",
+                "                        # the LogicalResourceId is the StackName in the describe_stack_resources() call",
+                "                        if key == 'LogicalResourceId':",
+                "                            stack_resource_id = value.strip('\\'')",
+                "                            break",
+                "                logger.debug('Stack [' + stack_resource_id + '] completed create/update')",
+                "        except:",
+                "            logger.debug('No SNS message found in event')",
+                "    ",
+                "    if not stack_resource_id:",
+                "        logger.debug('Did not find a create or update CloudFormation Stack that is complete')",
+                "        return",
+                "    ",
+                "    # get environment variables",
+                "    DYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']",
+                "    ",
+                "    # find the VPCs in the stack",
+                "    vpc_list = ''",
+                "    cf_response = cf_client.describe_stack_resources(StackName=stack_resource_id)",
+                "    ",
+                "    # stack_response is a dictionary (not JSON)",
+                "    for stack_resource in cf_response.get('StackResources'):",
+                "        # find the VPC resources",
+                "        if stack_resource.get('ResourceType') == 'AWS::EC2::VPC':",
+                "            # if this is not the first item in the list, prepend with ','",
+                "            if len(vpc_list):",
+                "                vpc_list += ','",
+                "            vpc_list += ('\\\"{}\\\"'.format(stack_resource.get('PhysicalResourceId')))",
+                "",
+                "    # logger.debug(vpc_list)",
+                "    # describe security groups",
+                "    security_groups_filter = json.loads('{\"Name\":\"vpc-id\",\"Values\":[' + vpc_list + ']}')",
+                "    # logger.debug('Security Groups Filter:' + json.dumps(security_groups_filter))",
+                "    ec2_response_security_groups = ec2_client.describe_security_groups(Filters=[security_groups_filter])['SecurityGroups']",
+                "    # logger.debug('Security Groups Description:' + json.dumps(ec2_response_security_groups))",
+                "",
+                "    # write security groups description to dynamodb",
+                "    for i in ec2_response_security_groups:",
+                "        dynamodb_response = dynamodb_client.update_item(",
+                "            TableName=DYNAMODB_TABLE,",
+                "            Key={",
+                "                'GroupId': {'S': i['GroupId']}",
+                "            },",
+                "            AttributeUpdates={",
+                "                'Description': {'Value': {'S': '[' + json.dumps(i) + ']'}}",
+                "            }",
+                "        )",
+                "        logger.debug('Wrote parameter value for ' + i['GroupId'] + ':' + json.dumps(i))",
+                "    ",
+                "    return ",
+                ""
+              ]
+            ]
+          }
+        },
+        "Runtime": "python3.6",
+        "Timeout": 60
+      }
+    },
+    "rVerifyInfrastructureValuesRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaENIManagementAccess"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "verify-infrastructure-values-policy"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:DescribeLogStreams"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:Describe*",
+                    "config:Put*",
+                    "kms:Decrypt",
+                    "kms:GenerateDataKey"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:Describe*",
+                    "dynamodb:Get*"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "rSecurityGroupsDescriptionTable",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "verify-infrastructure-values-role"
+            ]
+          ]
+        }
+      }
+    },
+    "rVerifyInfrastructureValuesInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "rVerifyInfrastructureValuesFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "config.amazonaws.com"
+      }
+    },
+    "rVerifyInfrastructureValuesFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Handler": "index.lambda_handler",
+        "FunctionName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "verify-infrastructure-values"
+            ]
+          ]
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "rVerifyInfrastructureValuesRole",
+            "Arn"
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "DYNAMODB_TABLE": {
+              "Ref": "rSecurityGroupsDescriptionTable"
+            }
+          }
+        },
+        "Code": {
+          "ZipFile": {
+            "Fn::Join": [
+              "\n",
+              [
+                "import json",
+                "import boto3",
+                "import os",
+                "import logging",
+                "",
+                "def lambda_handler(event, context):",
+                "    # configure logging",
+                "    logging.basicConfig(level=logging.DEBUG)",
+                "    logger=logging.getLogger(__name__)",
+                "    logger.setLevel(logging.DEBUG)",
+                "",
+                "    # set boto clients",
+                "    dynamodb_client = boto3.client('dynamodb')",
+                "    ec2_client = boto3.client('ec2')",
+                "    config_client = boto3.client('config')",
+                "",
+                "    # get values from event parameter",
+                "    logger.debug(json.dumps(event))",
+                "    logger.debug(event['invokingEvent'])",
+                "    invoking_event = json.loads(event['invokingEvent'])",
+                "    resource_type = invoking_event['configurationItem']['resourceType']",
+                "    resource_id = invoking_event['configurationItem']['resourceId']",
+                "    capture_time = invoking_event['configurationItem']['configurationItemCaptureTime']",
+                "    result_token = event['resultToken']",
+                "    ",
+                "    # compliance type of resource",
+                "    evaluation = ''",
+                "    ",
+                "    # if the resource being evaluated does not exist",
+                "    if invoking_event['configurationItem']['configurationItemStatus'] == 'ResourceDeleted':",
+                "        evaluation = 'NOT_APPLICABLE'",
+                "    # if the resource being evaluated exists",
+                "    else:",
+                "        logger.debug(json.dumps(invoking_event['configurationItem']['configuration']))",
+                "        group_id = invoking_event['configurationItem']['configuration']['groupId']",
+                "        vpc_id = invoking_event['configurationItem']['configuration']['vpcId']",
+                "        ",
+                "        ",
+                "        # get environment variables",
+                "        DYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']",
+                "        ",
+                "        dynamodb_response = dynamodb_client.get_item(",
+                "            TableName=DYNAMODB_TABLE,",
+                "            Key={",
+                "                'GroupId': {'S': group_id}",
+                "            }",
+                "        )",
+                "        item = ''",
+                "        evaluation = ''",
+                "        try:",
+                "            item = json.loads(dynamodb_response['Item']['Description']['S'])",
+                "        except:",
+                "            logger.error('No items found in DynamoDB table ' + DYNAMODB_TABLE)",
+                "            evaluation = 'NOT_APPLICABLE'",
+                "    ",
+                "        if evaluation != 'NOT_APPLICABLE':",
+                "            # describe security groups",
+                "            security_groups_filter = json.loads('{\"Name\":\"group-id\",\"Values\":[\"' + group_id + '\"]}')",
+                "            ec2_response = ec2_client.describe_security_groups(Filters=[security_groups_filter])['SecurityGroups']",
+                "            logger.debug('Expected: ' + json.dumps(item,sort_keys=True))",
+                "            logger.debug('Actual: ' + json.dumps(ec2_response,sort_keys=True))",
+                "            ",
+                "            if json.dumps(ec2_response,sort_keys=True) == json.dumps(item,sort_keys=True):",
+                "                evaluation = 'COMPLIANT'",
+                "            elif json.dumps(ec2_response,sort_keys=True) != json.dumps(item,sort_keys=True):",
+                "                logger.debug(' EC2 response ' + json.dumps(ec2_response,sort_keys=True) + ",
+                "                '\\ndoes not equal DynamoDB response ' + json.dumps(item,sort_keys=True))",
+                "                evaluation = 'NON_COMPLIANT'",
+                "            else:",
+                "                logger.error('Reached unexpected state in evaluation')",
+                "    ",
+                "    logger.debug('Resource evaluated as ' + evaluation)",
+                "    config_client.put_evaluations(ResultToken=result_token,",
+                "        Evaluations=[",
+                "            {",
+                "                'ComplianceResourceType': resource_type,",
+                "                'ComplianceResourceId': resource_id,",
+                "                'ComplianceType': evaluation,",
+                "                'OrderingTimestamp': capture_time",
+                "            }",
+                "        ])",
+                "    ",
+                "    return",
+                ""
+              ]
+            ]
+          }
+        },
+        "Runtime": "python3.6",
+        "Timeout": 60
+      }
+    },
+    "rVerifySecurityGroupsConfigRule": {
+      "Type": "AWS::Config::ConfigRule",
+      "DependsOn": [
+        "rVerifyInfrastructureValuesInvokePermission"
+      ],
+      "Properties": {
+        "ConfigRuleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "verify-security-groups-cfn"
+            ]
+          ]
+        },
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::EC2::SecurityGroup"
+          ]
+        },
+        "Source": {
+          "Owner": "CUSTOM_LAMBDA",
+          "SourceDetails": [
+            {
+              "EventSource": "aws.config",
+              "MessageType": "ConfigurationItemChangeNotification"
+            }
+          ],
+          "SourceIdentifier": {
+            "Fn::GetAtt": [
+              "rVerifyInfrastructureValuesFunction",
+              "Arn"
+            ]
+          }
+        }
+      }
+    },
+    "rUnmanagedEventRuleRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "detected-events-rule-policy"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:DescribeLogStreams"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": [
+                    {
+                      "Ref": "rAdministratorNotificationTopic"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "detected-events-rule-role"
+            ]
+          ]
+        }
+      }
+    },
+    "rUnmanagedEventRule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Description": "Identify Unmanaged Configuration Changes",
+        "EventPattern": {
+          "source": [
+            "aws.config"
+          ],
+          "detail-type": [
+            "Config Rules Compliance Change"
+          ],
+          "detail": {
+            "messageType": [
+              "ComplianceChangeNotification"
+            ],
+            "configRuleName": [
+              {
+                "Ref": "rVerifySecurityGroupsConfigRule"
+              }
+            ]
+          }
+        },
+        "State": "ENABLED",
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "rUnmanagedEventRuleRole",
+            "Arn"
+          ]
+        },
+        "Targets": [
+          {
+            "Arn": { "Fn::GetAtt": ["rNotifyInfrastructureValuesFunction", "Arn"] },
+            "Id": "notify-administrators"
+          }
+        ]
+      }
+    },
+    "rSubscribePersistInfrastructureValuesFunctionToInfrastructureEventsTopic": {
+      "Type": "AWS::SNS::Subscription",
+      "Properties": {
+        "Endpoint": {
+          "Fn::GetAtt": [
+            "rPersistInfrastructureValuesFunction",
+            "Arn"
+          ]
+        },
+        "Protocol": "lambda",
+        "TopicArn": {
+          "Ref": "rInfrastructureEventsTopic"
+        }
+      }
+    },
+    "rInfrastructureEventsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "infrastructure-events"
+            ]
+          ]
+        }
+      }
+    },
+    "rAdministratorNotificationTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "notify-administrators"
+            ]
+          ]
+        },
+        "Subscription": [
+          {
+            "Endpoint": {
+              "Ref": "pNotificationEmail"
+            },
+            "Protocol": "email"
+          }
+        ]
+      }
+    },
+    "rNotifyInfrastructureValuesRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaENIManagementAccess"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "notify-infrastructure-values-policy"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:DescribeLogStreams"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": {
+                    "Ref": "rAdministratorNotificationTopic"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "notify-infrastructure-values-role"
+            ]
+          ]
+        }
+      }
+    },
+    "rNotifyInfrastructureValuesInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "rNotifyInfrastructureValuesFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "events.amazonaws.com"
+      }
+    },
+    "rNotifyInfrastructureValuesFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Handler": "index.lambda_handler",
+        "FunctionName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "notify-infrastructure-values"
+            ]
+          ]
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "rNotifyInfrastructureValuesRole",
+            "Arn"
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "SNS_TOPIC": {
+              "Ref": "rAdministratorNotificationTopic"
+            }
+          }
+        },
+        "Code": {
+          "ZipFile": {
+            "Fn::Join": [
+              "\n",
+              [
+                "import json",
+                "import boto3",
+                "import os",
+                "import logging",
+                "",
+                "def lambda_handler(event, context):",
+                "    # configure logging",
+                "    logging.basicConfig(level=logging.DEBUG)",
+                "    logger=logging.getLogger(__name__)",
+                "    logger.setLevel(logging.DEBUG)",
+                "    logger.debug(json.dumps(event))",
+                "",
+                "    # set boto clients",
+                "    sns_client = boto3.client('sns')",
+                "",
+                "    # get values from event parameter",
+                "    detail_type = event['detail-type']",
+                "    resource = event['detail']['resourceId']",
+                "    evaluation = event['detail']['newEvaluationResult']['complianceType']",
+                "    config_rule_name = event['detail']['configRuleName']",
+                "    ",
+                "    subject = detail_type +': ' + resource + ' is ' + evaluation",
+                "    message = 'Config Rule ' + config_rule_name + ' evaluated resource ' + resource + ' as ' + evaluation",
+                "    ",
+                "    response = sns_client.publish(",
+                "        TopicArn=os.environ['SNS_TOPIC'],",
+                "        Message=message,",
+                "        Subject=subject",
+                "    )",
+                "    return ",
+                ""
+              ]
+            ]
+          }
+        },
+        "Runtime": "python3.6",
+        "Timeout": 60
+      }
+    },
+    "rSecurityGroupsDescriptionTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "GroupId",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "GroupId",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        },
+        "TableName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "security-groups-description"
+            ]
+          ]
+        }
+      }
+    },
+    "rInfrastructureStack": {
+      "Type": "AWS::CloudFormation::Stack",
+      "DependsOn": [
+        "rInfrastructureEventsTopic",
+        "rSecurityGroupsDescriptionTable",
+        "rAdministratorNotificationTopic",
+        "rUnmanagedEventRule",
+        "rVerifySecurityGroupsConfigRule",
+        "rVerifyInfrastructureValuesFunction",
+        "rPersistInfrastructureValuesFunction"
+      ],
+      "Properties": {
+        "NotificationARNs": [
+          {
+            "Ref": "rInfrastructureEventsTopic"
+          }
+        ],
+        "TemplateURL": {
+          "Ref": "pInfrastructureStackTemplate"
+        },
+        "Parameters": {
+          "pAllowedBastionCidrBlock": {
+            "Ref": "pAllowedBastionCidrBlock"
+          },
+          "pTopLevelStackName": {
+            "Ref": "AWS::StackName"
+          }
+        }
+      }
+    }
+  }
+}

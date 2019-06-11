@@ -1,0 +1,10 @@
+[
+  {
+    "ParameterKey": "pEvents",
+    "ParameterValue": "StopLogging, CreateNetworkAclEntry, CreateRoute, AuthorizeSecurityGroupEgress, AuthorizeSecurityGroupIngress, AttachInternetGateway, AttachVpnGateway, CreateVpcPeeringConnection, DeleteNetworkAcl, AttachRolePolicy, CreateUser, CreateVirtualMFADevice, DeactivateMFADevice, CreateAccessKey, CreateSAMLProvider, UpdateSAMLProvider, DeleteBucketPolicy, PutBucketAcl, PutBucketCors, PutBucketPolicy"
+  },
+  {
+    "ParameterKey": "pEmailSubscription",
+    "ParameterValue": "me@email.com"
+  }
+]

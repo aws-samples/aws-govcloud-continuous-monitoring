@@ -1,0 +1,301 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "",
+  "Metadata": {},
+  "Parameters": {
+    "pVpcId": {
+      "Type": "AWS::EC2::VPC::Id",
+      "Description": "Choose the VPC to attach to Kibana"
+    },
+    "pDomainAccessCidr": {
+      "Type": "String",
+      "Description": "The IP addresses range that can access the domain endpoint"
+    },
+    "pS3Bucket": {
+      "Type": "String",
+      "Description": "Enter the bucket that contains the flowlog-to-es.zip lambda function"
+    },
+    "pS3KeyPrefix": {
+      "Type": "String",
+      "Description": "Enter the key prefix of the flowlog-to-es.zip lambda function",
+      "Default": "vpc-flowlog-visualization/"
+    }
+  },
+  "Mappings": {},
+  "Conditions": {},
+  "Resources": {
+    "LogGroup": {
+      "Type": "AWS::Logs::LogGroup"
+    },
+    "VPCFlowLogsRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "vpc-flow-logs.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "VPCFlowLogPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:DescribeLogGroups",
+                    "logs:DescribeLogStreams",
+                    "logs:PutLogEvents"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "LogGroup",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "LambdaToElasticsearchRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "LambdaToElasticsearchPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "logs:CreateLogGroup"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "es:ESHttpPost",
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:es:*:*:*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ElasticsearchDomain": {
+      "Type": "AWS::Elasticsearch::Domain",
+      "Properties": {
+        "ElasticsearchVersion": "6.5",
+        "ElasticsearchClusterConfig": {
+          "InstanceCount": "1",
+          "InstanceType": "r5.large.elasticsearch"
+        },
+        "EBSOptions": {
+          "EBSEnabled": true,
+          "VolumeSize": 10,
+          "VolumeType": "gp2"
+        },
+        "SnapshotOptions": {
+          "AutomatedSnapshotStartHour": "0"
+        },
+        "AccessPolicies": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Action": "es:ESHttp*",
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:es:${AWS::Region}:${AWS::AccountId}:domain/*"
+              },
+              "Condition": {
+                "IpAddress": {
+                  "aws:SourceIp": {
+                    "Ref": "pDomainAccessCidr"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "AdvancedOptions": {
+          "rest.action.multi.allow_explicit_index": "true"
+        }
+      }
+    },
+    "VPCFlowLog": {
+      "DependsOn": [
+        "ElasticsearchDomain"
+      ],
+      "Type": "AWS::EC2::FlowLog",
+      "Properties": {
+        "DeliverLogsPermissionArn": {
+          "Fn::GetAtt": [
+            "VPCFlowLogsRole",
+            "Arn"
+          ]
+        },
+        "LogGroupName": {
+          "Ref": "LogGroup"
+        },
+        "ResourceId": {
+          "Ref": "pVpcId"
+        },
+        "ResourceType": "VPC",
+        "TrafficType": "ALL"
+      }
+    },
+    "FlowlogToElasticsearchFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Handler": "vpc-flowlogs-to-es.handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "LambdaToElasticsearchRole",
+            "Arn"
+          ]
+        },
+        "Code": {
+          "S3Bucket": {
+            "Ref": "pS3Bucket"
+          },
+          "S3Key": {
+            "Fn::Join": [
+              "",
+              [
+                {
+                  "Ref": "pS3KeyPrefix"
+                },
+                "flowlog-to-es.zip"
+              ]
+            ]
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "ES_DOMAIN": {
+              "Fn::GetAtt": [
+                "ElasticsearchDomain",
+                "DomainEndpoint"
+              ]
+            }
+          }
+        },
+        "Runtime": "nodejs8.10",
+        "Timeout": 20,
+        "TracingConfig": {
+          "Mode": "Active"
+        }
+      }
+    },
+    "FlowlogToElasticsearchFunctionPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "FlowlogToElasticsearchFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "logs.amazonaws.com",
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        },
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "LogGroup",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "SubscriptionFilter": {
+      "DependsOn": [
+        "FlowlogToElasticsearchFunctionPermission"
+      ],
+      "Type": "AWS::Logs::SubscriptionFilter",
+      "Properties": {
+        "LogGroupName": {
+          "Ref": "LogGroup"
+        },
+        "FilterPattern": {
+          "Fn::Join": [
+            "",
+            [
+              "[version, account_id, interface_id, srcaddr != \"-\", ",
+              "dstaddr != \"-\", srcport != \"-\", dstport != \"-\", ",
+              "protocol, packets, bytes, start, end, action, log_status]"
+            ]
+          ]
+        },
+        "DestinationArn": {
+          "Fn::GetAtt": [
+            "FlowlogToElasticsearchFunction",
+            "Arn"
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "KibanaUrl": {
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Fn::GetAtt": [
+                "ElasticsearchDomain",
+                "DomainEndpoint"
+              ]
+            },
+            "/_plugin/kibana/"
+          ]
+        ]
+      }
+    }
+  }
+}

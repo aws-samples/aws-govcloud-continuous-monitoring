@@ -1,0 +1,15 @@
+[
+  {
+    "ParameterKey": "pInfrastructureStackTemplate",
+    "ParameterValue": "https://s3.us-gov-west-1.amazonaws.com/my-bucket/identify-unmanaged-configuration-changes/identify-unmanaged-configuration-changes-infrastructure.json"
+  },
+  {
+    "ParameterKey": "pNotificationEmail",
+    "ParameterValue": "me@example.com"
+  },
+  {
+    "ParameterKey": "pAllowedBastionCidrBlock",
+    "ParameterValue": "1.2.3.4/32"
+  }
+]
+

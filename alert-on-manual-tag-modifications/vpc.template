@@ -1,0 +1,14 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Creates a VPC tagged as a Production environment
+Resources:
+  rVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Environment
+        Value: Production
+...

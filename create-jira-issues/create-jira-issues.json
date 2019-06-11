@@ -1,0 +1,621 @@
+{
+  "Parameters": {
+    "pJiraPasswordParameterName": {
+      "Type": "String",
+      "Description": "The name of an encrypted SSM Parameter containing the API key or password for the Jira user"
+    },
+    "pJiraUsername": {
+      "Type": "String",
+      "Description": "The name of the user the issue will be created with"
+    },
+    "pJiraUrl": {
+      "Type": "String",
+      "Description": "The url of the Jira instance"
+    },
+    "pJiraProjectKey": {
+      "Type": "String",
+      "Description": "The key of the project the issue should be created in"
+    },
+    "pJiraIssueTypeName": {
+      "Type": "String",
+      "Description": "The name of the type of issue you want to create (ex. Task, Sub-task, Bug, etc)"
+    },
+    "pSupportingFilesBucket": {
+      "Type": "String",
+      "Description": "The name of the S3 Bucket containing the supporting files"
+    },
+    "pSupportingFilesPrefix": {
+      "Type": "String",
+      "Description": "The name of the S3 Prefix containing the supporting files"
+    }
+  },
+  "Resources": {
+    "UnencryptedVolumesQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "unencrypted-volumes-queue"
+            ]
+          ]
+        },
+        "VisibilityTimeout": 300
+      }
+    },
+    "TriggerNotifyLambdaFromQueue": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "UnencryptedVolumesQueue",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "NotifyUnencryptedVolumesLambdaFunction",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "NotifyUnencryptedVolumesLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "notify-unencrypted-volumes-policy"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:GetQueueUrl",
+                    "sqs:GetQueueAttributes",
+                    "sqs:ReceiveMessage",
+                    "sqs:SendMessage",
+                    "sqs:DeleteMessage"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "UnencryptedVolumesQueue",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudtrail:LookupEvents"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "PermissionsForAWSCreateJiraIssue",
+                  "Effect": "Allow",
+                  "Action": [
+                    "ssm:DescribeParameters",
+                    "ssm:GetParameter*",
+                    "ssm:StartAutomationExecution",
+                    "cloudformation:CreateStack",
+                    "cloudformation:DescribeStacks",
+                    "cloudformation:DeleteStack",
+                    "iam:CreateRole",
+                    "iam:DeleteRole",
+                    "iam:PutRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:GetRole",
+                    "iam:PassRole",
+                    "lambda:GetFunction",
+                    "lambda:CreateFunction",
+                    "lambda:DeleteFunction",
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "notify-unencrypted-volumes-role"
+            ]
+          ]
+        }
+      }
+    },
+    "NotifyUnencryptedVolumesLambdaInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "NotifyUnencryptedVolumesLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "sqs.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "UnencryptedVolumesQueue",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "IdentifyUnencryptedVolumesLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "identify-unencrypted-volumes-policy"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "UnencryptedVolumesQueue",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:DescribeVolume*"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "identify-unencrypted-volumes-role"
+            ]
+          ]
+        }
+      }
+    },
+    "IdentifyUnencryptedVolumesEventRule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Description": "Identify Unencrypted EBS Volumes",
+        "EventPattern": {
+          "source": [
+            "aws.ec2"
+          ],
+          "detail-type": [
+            "EBS Volume Notification"
+          ],
+          "detail": {
+            "event": [
+              "createVolume"
+            ]
+          }
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "IdentifyUnencryptedVolumesLambdaFunction",
+                "Arn"
+              ]
+            },
+            "Id": "check-for-unencrypted-volumes"
+          }
+        ]
+      }
+    },
+    "IdentifyUnencryptedVolumesLambdaInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "IdentifyUnencryptedVolumesLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "IdentifyUnencryptedVolumesEventRule",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "IdentifyUnencryptedVolumesLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Handler": "index.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "IdentifyUnencryptedVolumesLambdaRole",
+            "Arn"
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "SQS_QUEUE_URL": {
+              "Ref": "UnencryptedVolumesQueue"
+            }
+          }
+        },
+        "Code": {
+          "ZipFile": {
+            "Fn::Join": [
+              "\n",
+              [
+                "import json",
+                "import boto3",
+                "import os",
+                "",
+                "ec2_client = boto3.client('ec2')",
+                "sqs_client = boto3.client('sqs')",
+                "",
+                "def lambda_handler(event, context):",
+                "    ",
+                "    print(json.dumps(event))",
+                "    ",
+                "    delay_seconds = 300",
+                "    # get environment variables",
+                "    sqs_queue = os.environ['SQS_QUEUE_URL']",
+                "    ",
+                "    # list of volumes in the event",
+                "    volumes_list = []",
+                "    ",
+                "    print('Identifying EBS Volume(s)')",
+                "    for r in event['resources']:",
+                "        arn = r",
+                "        # parse the volume id from the arn",
+                "        volume_id = r.rsplit('/', 1)[-1]",
+                "        volumes_list.append(volume_id)",
+                "        ",
+                "    response = ec2_client.describe_volumes(",
+                "        Filters=[",
+                "            {",
+                "                'Name': 'encrypted',",
+                "                'Values': [",
+                "                    'false',",
+                "                ]",
+                "            },",
+                "        ],",
+                "        VolumeIds=volumes_list",
+                "    )",
+                "    ",
+                "    found_unencrypted_volume = False",
+                "    ",
+                "    # identify the instances associated with unencrypted volumes",
+                "    for v in response['Volumes']:",
+                "        for a in v['Attachments']:",
+                "            found_unencrypted_volume = True",
+                "            print('Instance ' + a['InstanceId'] + ' in account ' + event['account'] + ' is associated with unencrypted volume ' + a['VolumeId'])",
+                "            print('Publishing to queue ' + sqs_queue + ' message ' + json.dumps({'instance': a['InstanceId'], 'volume':a['VolumeId'], 'account':event['account']}))",
+                "            # post to queue with delay so cloudtrail has time to receive the event",
+                "            sqs_client.send_message(QueueUrl=sqs_queue, DelaySeconds=delay_seconds, MessageBody=json.dumps({'instance': a['InstanceId'], 'volume':a['VolumeId'], 'account':event['account']}))",
+                "            ",
+                "    if not found_unencrypted_volume:",
+                "        print('No unencrypted EBS Volumes found')",
+                "             ",
+                "    return",
+                ""
+              ]
+            ]
+          }
+        },
+        "Runtime": "python3.6",
+        "Timeout": 60
+      }
+    },
+    "NotifyUnencryptedVolumesLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Handler": "notify-unencrypted-volumes.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "NotifyUnencryptedVolumesLambdaRole",
+            "Arn"
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "JIRA_USERNAME": {
+              "Ref": "pJiraUsername"
+            },
+            "JIRA_PASSWORD_PARAMETER_NAME": {
+              "Ref": "pJiraPasswordParameterName"
+            },
+            "JIRA_PROJECT_KEY": {
+              "Ref": "pJiraProjectKey"
+            },
+            "JIRA_URL": {
+              "Ref": "pJiraUrl"
+            },
+            "JIRA_ISSUE_TYPE_NAME": {
+              "Ref": "pJiraIssueTypeName"
+            }
+          }
+        },
+        "Code": {
+          "S3Bucket": {
+            "Ref": "pSupportingFilesBucket"
+          },
+          "S3Key": {
+            "Fn::Join": [
+              "",
+              [
+                {
+                  "Ref": "pSupportingFilesPrefix"
+                },
+                "notify-unencrypted-volumes.zip"
+              ]
+            ]
+          }
+        },
+        "Runtime": "python3.6",
+        "Timeout": 60
+      }
+    },
+    "ReportUnencryptedVolumesLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "report-unencrypted-volumes-policy"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudtrail:LookupEvents",
+                    "ec2:DescribeVolume*"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "report-unencrypted-volumes-role"
+            ]
+          ]
+        }
+      }
+    },
+    "ReportUnencryptedVolumesLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Handler": "index.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "ReportUnencryptedVolumesLambdaRole",
+            "Arn"
+          ]
+        },
+        "Code": {
+          "ZipFile": {
+            "Fn::Join": [
+              "\n",
+              [
+                "import json",
+                "import boto3",
+                "import os",
+                "",
+                "ec2_client = boto3.client('ec2')",
+                "cloudtrail_client = boto3.client('cloudtrail')",
+                "",
+                "def lambda_handler(event, context):",
+                "    ",
+                "    # list of instances with unencrypted volumes",
+                "    instances_list = []",
+                "    ",
+                "    # notification to send",
+                "    notification = []",
+                "    ",
+                "    print('Querying EC2 for unencrypted EBS Volumes')",
+                "    response = ec2_client.describe_volumes(",
+                "        Filters=[",
+                "        {",
+                "                'Name': 'encrypted',",
+                "                'Values': [",
+                "                    'false',",
+                "                ]",
+                "            },",
+                "        ]",
+                "    )",
+                "    ",
+                "    # identify the instances associated with unencrypted volumes",
+                "    for v in response['Volumes']:",
+                "        for a in v['Attachments']:",
+                "            # append to the list of instances with unencrypted volumes",
+                "            instances_list.append({'instance': a['InstanceId'], 'volume':a['VolumeId']})",
+                "            print('Instance ' + a['InstanceId'] + ' is associated with unencrypted volume ' + a['VolumeId'])",
+                "    ",
+                "    print('Querying CloudTrail for RunInstances events')",
+                "    cloudtrail_events = cloudtrail_client.lookup_events(",
+                "        LookupAttributes=[",
+                "            {",
+                "                'AttributeKey': 'EventName',",
+                "                'AttributeValue': 'RunInstances'",
+                "            }",
+                "        ]",
+                "    )",
+                "",
+                "    # find the user that created each instance with an unencrypted volume",
+                "    for i in instances_list:",
+                "        # count how many events matched this instance",
+                "        count = 0",
+                "        ",
+                "        for e in cloudtrail_events['Events']:",
+                "            for r in e['Resources']:",
+                "                if r['ResourceName'] == i['instance']:",
+                "                    # found a RunInstances event that matched this instance",
+                "                    count += 1",
+                "                    # instead of just printing 'AutoScaling', print the IAM Role that initiated the AutoScaling event",
+                "                    if e['Username'] == 'AutoScaling':",
+                "                        print('IAM Role ' + json.loads(e['CloudTrailEvent'])['userIdentity']['arn'] + ' created instance ' + i['instance'] + ' with unencrypted volume ' + i['volume'])",
+                "                        notification.append('IAM Role ' + json.loads(e['CloudTrailEvent'])['userIdentity']['arn'] + ' created instance ' + i['instance'] + ' with unencrypted volume ' + i['volume'])",
+                "                    else:",
+                "                        print('User ' + e['Username'] + ' created instance ' + i['instance'] + ' with unencrypted volume ' + i['volume'])",
+                "                        notification.append('User ' + e['Username'] + ' created instance ' + i['instance'] + ' with unencrypted volume ' + i['volume'])",
+                "        # if no RunInstances events matched this instance",
+                "        if count == 0:",
+                "             print('No events found in CloudTrail for creating EC2 instance ' + i['instance'] + ' with unencrypted volume ' + i['volume'])",
+                "             notification.append('No events found in CloudTrail for creating EC2 instance ' + i['instance'] + ' with unencrypted volume ' + i['volume'])",
+                "",
+                "    if notification:",
+                "        notification.append('More information about encrypting EBS Volumes: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html')",
+                "        print('\\n'.join(notification))",
+                "    else:",
+                "        print('No unencrypted EBS Volumes found')",
+                "    return",
+                ""
+              ]
+            ]
+          }
+        },
+        "Runtime": "python3.6",
+        "Timeout": 60
+      }
+    }
+  }
+}

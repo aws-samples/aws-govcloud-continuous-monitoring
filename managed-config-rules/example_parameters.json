@@ -1,0 +1,19 @@
+[
+  {
+    "ParameterKey": "amiIds",
+    "ParameterValue": "ami-6aa7db0b"
+  },
+  {
+    "ParameterKey": "blacklistedApplicationNames",
+    "ParameterValue": "firefox"
+  },
+  {
+    "ParameterKey": "requiredApplicationNames",
+    "ParameterValue": "chrome"
+  },
+  {
+    "ParameterKey": "tag1Key",
+    "ParameterValue": "Environment"
+  }
+]
+

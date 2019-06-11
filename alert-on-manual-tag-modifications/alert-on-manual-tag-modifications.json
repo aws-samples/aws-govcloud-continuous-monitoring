@@ -1,0 +1,252 @@
+{
+  "Parameters": {
+    "pProtectedTags": {
+      "Type": "String",
+      "Default": "Hostname, OS",
+      "Description": "Comma-Separated List of protected tags"
+    },
+    "pEmailSubscription": {
+      "Type": "String",
+      "Description": "Email address to subscribe to alerts"
+    }
+  },
+  "Resources": {
+    "ProtectedTagsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "protected-tags-topic"
+            ]
+          ]
+        },
+        "Subscription": [
+          {
+            "Endpoint": {
+              "Ref": "pEmailSubscription"
+            },
+            "Protocol": "email"
+          }
+        ]
+      }
+    },
+    "ProtectedTagsLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "protected-tags-policy"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": {
+                    "Ref": "ProtectedTagsTopic"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "protected-tags-role"
+            ]
+          ]
+        }
+      }
+    },
+    "ProtectedTagsEventRule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Description": "Protected Tags Event Rule",
+        "EventPattern": {
+          "source": [
+            "aws.ec2"
+          ],
+          "detail-type": [
+            "AWS API Call via CloudTrail"
+          ],
+          "detail": {
+            "eventSource": [
+              "ec2.amazonaws.com"
+            ],
+            "eventName": [
+              "CreateTags"
+            ]
+          }
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "ProtectedTagsLambdaFunction",
+                "Arn"
+              ]
+            },
+            "Id": "check-for-protected-tags"
+          }
+        ]
+      }
+    },
+    "ProtectedTagsLambdaInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ProtectedTagsLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "ProtectedTagsEventRule",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "ProtectedTagsLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Handler": "index.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "ProtectedTagsLambdaRole",
+            "Arn"
+          ]
+        },
+        "Environment": {
+          "Variables": {
+            "SNS_TOPIC_ARN": {
+              "Ref": "ProtectedTagsTopic"
+            },
+            "PROTECTED_TAGS": {
+              "Ref": "pProtectedTags"
+            }
+          }
+        },
+        "Code": {
+          "ZipFile": {
+            "Fn::Join": [
+              "\n",
+              [
+                "import json",
+                "import boto3",
+                "import os",
+                "import ast",
+                "",
+                "def lambda_handler(event, context):",
+                "    print('Event:' + json.dumps(event))",
+                "    ",
+                "    sns_topic_arn = os.environ['SNS_TOPIC_ARN']",
+                "    # convert the environment variable from a string to a list",
+                "    protected_tags = os.environ['PROTECTED_TAGS'].split(',')",
+                "",
+                "    user_name = ''",
+                "    try:",
+                "        # IAM user",
+                "        user_name = event['detail']['userIdentity']['userName']",
+                "    except:",
+                "        # assumed IAM role",
+                "        user_name = event['detail']['userIdentity']['arn']",
+                "        # parse the user name from the arn",
+                "        user_name = user_name.rsplit('/',1)[-1]",
+                "        ",
+                "    event_name = event['detail']['eventName']",
+                "    user_agent = event['detail']['userAgent']",
+                "    tag_list = event['detail']['requestParameters']['tagSet']['items']",
+                "    resource_list = event['detail']['requestParameters']['resourcesSet']['items']",
+                "    ",
+                "    sns_client = boto3.client('sns')",
+                "    ",
+                "    for t in tag_list:",
+                "        if (user_agent != 'cloudformation.amazonaws.com') and (t['key'] in protected_tags):",
+                "            instances = ''",
+                "            if len(resource_list) == 1:",
+                "                instances = resource_list[0]['resourceId']",
+                "            else:",
+                "                instances_list = []",
+                "                for r in resource_list:",
+                "                    instances_list.append(r['resourceId'])",
+                "                instances = ', '.join(instances_list)",
+                "            message = 'IAM user ' + user_name + ' executed ' + event_name + ' outside of CloudFormation on protected tag ' + t['key'] + ' on resource(s) ' + instances",
+                "            print(message)",
+                "            sns_client.publish(",
+                "                TopicArn=sns_topic_arn,",
+                "                Message=message",
+                "                )",
+                "            return {",
+                "                'statusCode': 200,",
+                "                'body': message",
+                "            }",
+                "",
+                "    message = 'No protected tags created outside of CloudFormation'",
+                "    print(message)",
+                "    return {",
+                "        'statusCode': 200,",
+                "        'body': message",
+                "    }",
+                ""
+              ]
+            ]
+          }
+        },
+        "Runtime": "python3.6",
+        "Timeout": 60
+      }
+    }
+  }
+}

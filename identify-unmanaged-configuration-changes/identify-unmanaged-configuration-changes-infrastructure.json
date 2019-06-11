@@ -1,0 +1,61 @@
+{
+  "Parameters": {
+    "pAllowedBastionCidrBlock": {
+      "Type": "String"
+    },
+    "pTopLevelStackName": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "rVpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/24"
+      }
+    },
+    "rBastionSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "VpcId": {
+          "Ref": "rVpc"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Bastion"
+          }
+        ],
+        "GroupName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "bastion-sg"
+            ]
+          ]
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "Description": "inbound-ssh",
+            "CidrIp": {
+              "Ref": "pAllowedBastionCidrBlock"
+            }
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "GroupDescription": "Bastion Security Group"
+      }
+    }
+  }
+}

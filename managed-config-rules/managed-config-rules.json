@@ -1,0 +1,1290 @@
+{
+  "Resources": {
+    "APPROVEDAMISBYID": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "approved-amis-by-id",
+        "Description": "Checks whether running instances are using specified AMIs.",
+        "InputParameters": {
+          "amiIds": {
+            "Fn::If": [
+              "amiIds",
+              {
+                "Ref": "amiIds"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::EC2::Instance"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "APPROVED_AMIS_BY_ID"
+        }
+      }
+    },
+    "EC2INSTANCEMANAGEDBYSSM": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "ec2-instance-managed-by-systems-manager",
+        "Description": "Checks whether the Amazon EC2 instances in your account are managed by AWS Systems Manager.",
+        "InputParameters": {},
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::EC2::Instance",
+            "AWS::SSM::ManagedInstanceInventory"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "EC2_INSTANCE_MANAGED_BY_SSM"
+        }
+      }
+    },
+    "EC2MANAGEDINSTANCEAPPLICATIONSREQUIRED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "ec2-managedinstance-applications-required",
+        "Description": "Checks whether all of the specified applications are installed on the instance. Optionally, specify the minimum acceptable version. Optionally, specify the platform to apply the rule only to instances running that platform.",
+        "InputParameters": {
+          "applicationNames": {
+            "Fn::If": [
+              "requiredApplicationNames",
+              {
+                "Ref": "requiredApplicationNames"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "platformType": {
+            "Fn::If": [
+              "requiredPlatformType",
+              {
+                "Ref": "requiredPlatformType"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::SSM::ManagedInstanceInventory"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "EC2_MANAGEDINSTANCE_APPLICATIONS_REQUIRED"
+        }
+      }
+    },
+    "EC2MANAGEDINSTANCEAPPLICATIONSBLACKLISTED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "ec2-managedinstance-applications-blacklisted",
+        "Description": "Checks that none of the specified applications are installed on the instance. Optionally, specify the version. Newer versions will not be blacklisted. Optionally, specify the platform to apply the rule only to instances running that platform.",
+        "InputParameters": {
+          "applicationNames": {
+            "Fn::If": [
+              "blacklistedApplicationNames",
+              {
+                "Ref": "blacklistedApplicationNames"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "platformType": {
+            "Fn::If": [
+              "blacklistedPlatformType",
+              {
+                "Ref": "blacklistedPlatformType"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::SSM::ManagedInstanceInventory"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "EC2_MANAGEDINSTANCE_APPLICATIONS_BLACKLISTED"
+        }
+      }
+    },
+    "ELBLOGGINGENABLED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "elb-logging-enabled",
+        "Description": "Checks whether the Application Load Balancers and the Classic Load Balancers have logging enabled.",
+        "InputParameters": {
+          "s3BucketNames": {
+            "Fn::If": [
+              "s3BucketNamesElbLogs",
+              {
+                "Ref": "s3BucketNamesElbLogs"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::ElasticLoadBalancing::LoadBalancer",
+            "AWS::ElasticLoadBalancingV2::LoadBalancer"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "ELB_LOGGING_ENABLED"
+        }
+      }
+    },
+    "DBINSTANCEBACKUPENABLED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "db-instance-backup-enabled",
+        "Description": "Checks whether RDS DB instances have backups enabled.",
+        "InputParameters": {
+          "backupRetentionPeriod": {
+            "Fn::If": [
+              "backupRetentionPeriod",
+              {
+                "Ref": "backupRetentionPeriod"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "preferredBackupWindow": {
+            "Fn::If": [
+              "preferredBackupWindow",
+              {
+                "Ref": "preferredBackupWindow"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "checkReadReplicas": {
+            "Fn::If": [
+              "checkReadReplicas",
+              {
+                "Ref": "checkReadReplicas"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::RDS::DBInstance"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "DB_INSTANCE_BACKUP_ENABLED"
+        }
+      }
+    },
+    "RDSINSTANCEPUBLICACCESSCHECK": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "rds-instance-public-access-check",
+        "Description": "Checks whether the Amazon Relational Database Service (RDS) instances are not publicly accessible. The rule is non-compliant if the publiclyAccessible field is true in the instance configuration item.",
+        "InputParameters": {},
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::RDS::DBInstance"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "RDS_INSTANCE_PUBLIC_ACCESS_CHECK"
+        }
+      }
+    },
+    "RDSMULTIAZSUPPORT": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "rds-multi-az-support",
+        "Description": "Checks whether high availability is enabled for your RDS DB instances.",
+        "InputParameters": {},
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::RDS::DBInstance"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "RDS_MULTI_AZ_SUPPORT"
+        }
+      }
+    },
+    "RDSSNAPSHOTSPUBLICPROHIBITED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "rds-snapshots-public-prohibited",
+        "Description": "Checks if Amazon Relational Database Service (Amazon RDS) snapshots are public. The rule is non-compliant if any existing and new Amazon RDS snapshots are public.",
+        "InputParameters": {},
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::RDS::DBSnapshot"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "RDS_SNAPSHOTS_PUBLIC_PROHIBITED"
+        }
+      }
+    },
+    "RDSSTORAGEENCRYPTED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "rds-storage-encrypted",
+        "Description": "Checks whether storage encryption is enabled for your RDS DB instances.",
+        "InputParameters": {
+          "kmsKeyId": {
+            "Fn::If": [
+              "kmsKeyIdRds",
+              {
+                "Ref": "kmsKeyIdRds"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::RDS::DBInstance"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "RDS_STORAGE_ENCRYPTED"
+        }
+      }
+    },
+    "ENCRYPTEDVOLUMES": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "encrypted-volumes",
+        "Description": "Checks whether EBS volumes that are in an attached state are encrypted.",
+        "InputParameters": {
+          "kmsId": {
+            "Fn::If": [
+              "kmsKeyIdEbs",
+              {
+                "Ref": "kmsKeyIdEbs"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::EC2::Volume"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "ENCRYPTED_VOLUMES"
+        }
+      }
+    },
+    "CLOUDTRAILCLOUDWATCHLOGSENABLED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "cloud-trail-cloud-watch-logs-enabled",
+        "Description": "Checks whether AWS CloudTrail trails are configured to send logs to Amazon CloudWatch logs. The trail is non-compliant if the CloudWatchLogsLogGroupArn property of the trail is empty.",
+        "InputParameters": {
+          "expectedDeliveryWindowAge": {
+            "Fn::If": [
+              "expectedDeliveryWindowAge",
+              {
+                "Ref": "expectedDeliveryWindowAge"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {},
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "CLOUD_TRAIL_CLOUD_WATCH_LOGS_ENABLED"
+        },
+        "MaximumExecutionFrequency": {
+          "Ref": "MaximumExecutionFrequencyCloudTrail"
+        }
+      }
+    },
+    "CLOUDTRAILENCRYPTIONENABLED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "cloud-trail-encryption-enabled",
+        "Description": "Checks whether AWS CloudTrail is configured to use the server side encryption (SSE) AWS Key Management Service (AWS KMS) customer master key (CMK) encryption. The rule is compliant if the KmsKeyId is defined.",
+        "InputParameters": {},
+        "Scope": {},
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "CLOUD_TRAIL_ENCRYPTION_ENABLED"
+        },
+        "MaximumExecutionFrequency": {
+          "Ref": "MaximumExecutionFrequencyCloudTrail"
+        }
+      }
+    },
+    "CLOUDTRAILENABLED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "cloudtrail-enabled",
+        "Description": "Checks whether AWS CloudTrail is enabled in your AWS account.",
+        "InputParameters": {
+          "s3BucketName": {
+            "Fn::If": [
+              "s3BucketNameCloudTrail",
+              {
+                "Ref": "s3BucketNameCloudTrail"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "snsTopicArn": {
+            "Fn::If": [
+              "snsTopicArnCloudTrail",
+              {
+                "Ref": "snsTopicArnCloudTrail"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "cloudWatchLogsLogGroupArn": {
+            "Fn::If": [
+              "cloudWatchLogsLogGroupArnCloudTrail",
+              {
+                "Ref": "cloudWatchLogsLogGroupArnCloudTrail"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {},
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "CLOUD_TRAIL_ENABLED"
+        },
+        "MaximumExecutionFrequency": {
+          "Ref": "MaximumExecutionFrequencyCloudTrail"
+        }
+      }
+    },
+    "VPCFLOWLOGSENABLED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "vpc-flow-logs-enabled",
+        "Description": "Checks whether Amazon Virtual Private Cloud flow logs are found and enabled for Amazon VPC.",
+        "InputParameters": {
+          "trafficType": {
+            "Fn::If": [
+              "trafficType",
+              {
+                "Ref": "trafficType"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {},
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "VPC_FLOW_LOGS_ENABLED"
+        },
+        "MaximumExecutionFrequency": {
+          "Ref": "MaximumExecutionFrequencyVpcFlowLogs"
+        }
+      }
+    },
+    "VPCDEFAULTSECURITYGROUPCLOSED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "vpc-default-security-group-closed",
+        "Description": "Checks that the default security group of any Amazon Virtual Private Cloud (VPC) does not allow inbound or outbound traffic. The rule is non-compliant if the default security group has one or more inbound or outbound traffic.",
+        "InputParameters": {},
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::EC2::SecurityGroup"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "VPC_DEFAULT_SECURITY_GROUP_CLOSED"
+        }
+      }
+    },
+    "IAMPOLICYNOSTATEMENTSWITHADMINACCESS": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "iam-policy-no-statements-with-admin-access",
+        "Description": "Checks whether the default version of AWS Identity and Access Management (IAM) policies do not have administrator access. If any statement has \"Effect\": \"Allow\" with \"Action\": \"*\" over \"Resource\": \"*\", the rule is non-compliant.",
+        "InputParameters": {},
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::IAM::Policy"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "IAM_POLICY_NO_STATEMENTS_WITH_ADMIN_ACCESS"
+        }
+      }
+    },
+    "S3BUCKETPUBLICREADPROHIBITED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "s3-bucket-public-read-prohibited",
+        "Description": "Checks that your S3 buckets do not allow public read access. If an S3 bucket policy or bucket ACL allows public read access, the bucket is noncompliant.",
+        "InputParameters": {},
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::S3::Bucket"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "S3_BUCKET_PUBLIC_READ_PROHIBITED"
+        }
+      }
+    },
+    "S3BUCKETPUBLICWRITEPROHIBITED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "s3-bucket-public-write-prohibited",
+        "Description": "Checks that your S3 buckets do not allow public write access. If an S3 bucket policy or bucket ACL allows public write access, the bucket is noncompliant.",
+        "InputParameters": {},
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::S3::Bucket"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "S3_BUCKET_PUBLIC_WRITE_PROHIBITED"
+        }
+      }
+    },
+    "S3BUCKETSERVERSIDEENCRYPTIONENABLED": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "s3-bucket-server-side-encryption-enabled",
+        "Description": "Checks that your Amazon S3 bucket either has S3 default encryption enabled or that the S3 bucket policy explicitly denies put-object requests without server side encryption.",
+        "InputParameters": {},
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::S3::Bucket"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED"
+        }
+      }
+    },
+    "S3BUCKETSSLREQUESTSONLY": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "s3-bucket-ssl-requests-only",
+        "Description": "Checks whether S3 buckets have policies that require requests to use Secure Socket Layer (SSL).",
+        "InputParameters": {},
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::S3::Bucket"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "S3_BUCKET_SSL_REQUESTS_ONLY"
+        }
+      }
+    },
+    "REQUIREDTAGS": {
+      "Type": "AWS::Config::ConfigRule",
+      "Properties": {
+        "ConfigRuleName": "required-tags",
+        "Description": "Checks whether your resources have the tags that you specify.",
+        "InputParameters": {
+          "tag1Key": {
+            "Fn::If": [
+              "tag1Key",
+              {
+                "Ref": "tag1Key"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag1Value": {
+            "Fn::If": [
+              "tag1Value",
+              {
+                "Ref": "tag1Value"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag2Key": {
+            "Fn::If": [
+              "tag2Key",
+              {
+                "Ref": "tag2Key"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag2Value": {
+            "Fn::If": [
+              "tag2Value",
+              {
+                "Ref": "tag2Value"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag3Key": {
+            "Fn::If": [
+              "tag3Key",
+              {
+                "Ref": "tag3Key"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag3Value": {
+            "Fn::If": [
+              "tag3Value",
+              {
+                "Ref": "tag3Value"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag4Key": {
+            "Fn::If": [
+              "tag4Key",
+              {
+                "Ref": "tag4Key"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag4Value": {
+            "Fn::If": [
+              "tag4Value",
+              {
+                "Ref": "tag4Value"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag5Key": {
+            "Fn::If": [
+              "tag5Key",
+              {
+                "Ref": "tag5Key"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag5Value": {
+            "Fn::If": [
+              "tag5Value",
+              {
+                "Ref": "tag5Value"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag6Key": {
+            "Fn::If": [
+              "tag6Key",
+              {
+                "Ref": "tag6Key"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "tag6Value": {
+            "Fn::If": [
+              "tag6Value",
+              {
+                "Ref": "tag6Value"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          }
+        },
+        "Scope": {
+          "ComplianceResourceTypes": [
+            "AWS::EC2::Instance"
+          ]
+        },
+        "Source": {
+          "Owner": "AWS",
+          "SourceIdentifier": "REQUIRED_TAGS"
+        }
+      }
+    }
+  },
+  "Parameters": {
+    "amiIds": {
+      "Type": "String",
+      "Description": "Specify AMI IDs (comma separated list of up to 10).",
+      "MinLength": "1",
+      "ConstraintDescription": "This parameter is required."
+    },
+    "requiredApplicationNames": {
+      "Type": "String",
+      "Description": "Comma-separated list of application names. Optionally, specify versions appended with ':' (for example, 'Chrome:0.5.3, Firefox').",
+      "MinLength": "1",
+      "ConstraintDescription": "This parameter is required."
+    },
+    "requiredPlatformType": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Platform type (for example, 'Linux')."
+    },
+    "blacklistedApplicationNames": {
+      "Type": "String",
+      "Description": "Comma-separated list of application names. Optionally, specify versions appended with ':' (for example, 'Chrome:0.5.3, Firefox').",
+      "MinLength": "1",
+      "ConstraintDescription": "This parameter is required."
+    },
+    "blacklistedPlatformType": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Platform type (for example, 'Linux')."
+    },
+    "s3BucketNamesElbLogs": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Comma-separated list of Amazon S3 bucket names for Amazon ELB to deliver the log files."
+    },
+    "backupRetentionPeriod": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Retention period for backups."
+    },
+    "preferredBackupWindow": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Time range in which backups are created."
+    },
+    "checkReadReplicas": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Checks whether RDS DB instances have backups enabled for read replicas."
+    },
+    "kmsKeyIdEbs": {
+      "Type": "String",
+      "Default": "",
+      "Description": "ID or ARN of the KMS key that is used to encrypt the volume."
+    },
+    "kmsKeyIdRds": {
+      "Type": "String",
+      "Default": "",
+      "Description": "ID or ARN of the KMS key that is used to encrypt the RDS Instance."
+    },
+    "MaximumExecutionFrequencyCloudTrail": {
+      "Type": "String",
+      "Default": "TwentyFour_Hours",
+      "Description": "The frequency that you want AWS Config to run evaluations for the rule.",
+      "MinLength": "1",
+      "ConstraintDescription": "This parameter is required.",
+      "AllowedValues": [
+        "One_Hour",
+        "Three_Hours",
+        "Six_Hours",
+        "Twelve_Hours",
+        "TwentyFour_Hours"
+      ]
+    },
+    "MaximumExecutionFrequencyVpcFlowLogs": {
+      "Type": "String",
+      "Default": "TwentyFour_Hours",
+      "Description": "The frequency that you want AWS Config to run evaluations for the rule.",
+      "MinLength": "1",
+      "ConstraintDescription": "This parameter is required.",
+      "AllowedValues": [
+        "One_Hour",
+        "Three_Hours",
+        "Six_Hours",
+        "Twelve_Hours",
+        "TwentyFour_Hours"
+      ]
+    },
+    "expectedDeliveryWindowAge": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Maximum age in hours of the most recent delivery to CloudWatch logs that satisfies compliance."
+    },
+    "s3BucketNameCloudTrail": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Name of S3 bucket for CloudTrail to deliver log files to."
+    },
+    "snsTopicArnCloudTrail": {
+      "Type": "String",
+      "Default": "",
+      "Description": "SNS topic ARN for CloudTrail to use for notifications."
+    },
+    "cloudWatchLogsLogGroupArnCloudTrail": {
+      "Type": "String",
+      "Default": "",
+      "Description": "CloudWatch log group ARN for CloudTrail to send data to."
+    },
+    "trafficType": {
+      "Type": "String",
+      "Default": "",
+      "Description": "TrafficType of flow logs"
+    },
+    "MaximumExecutionFrequencyCloudFormation": {
+      "Type": "String",
+      "Default": "TwentyFour_Hours",
+      "Description": "The frequency that you want AWS Config to run evaluations for the rule.",
+      "MinLength": "1",
+      "ConstraintDescription": "This parameter is required.",
+      "AllowedValues": [
+        "One_Hour",
+        "Three_Hours",
+        "Six_Hours",
+        "Twelve_Hours",
+        "TwentyFour_Hours"
+      ]
+    },
+    "kmsId": {
+      "Type": "String",
+      "Default": "",
+      "Description": "ID or ARN of the KMS key that is used to encrypt the volume."
+    },
+    "tag1Key": {
+      "Type": "String",
+      "Description": "Key of the required tag.",
+      "MinLength": "1",
+      "ConstraintDescription": "This parameter is required."
+    },
+    "tag1Value": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional value of the required tag. Separate multiple values with commas."
+    },
+    "tag2Key": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Key of a second required tag."
+    },
+    "tag2Value": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional value of the second required tag. Separate multiple values with commas."
+    },
+    "tag3Key": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Key of a third required tag."
+    },
+    "tag3Value": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional value of the third required tag. Separate multiple values with commas."
+    },
+    "tag4Key": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Key of a fourth required tag."
+    },
+    "tag4Value": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional value of the fourth required tag. Separate multiple values with commas."
+    },
+    "tag5Key": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Key of a fifth required tag."
+    },
+    "tag5Value": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional value of the fifth required tag. Separate multiple values with commas."
+    },
+    "tag6Key": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Key of a sixth required tag."
+    },
+    "tag6Value": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional value of the sixth required tag. Separate multiple values with commas."
+    }
+  },
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [
+        {
+          "Label": {
+            "default": "Required"
+          },
+          "Parameters": [
+            "amiIds",
+            "blacklistedApplicationNames",
+            "requiredApplicationNames",
+            "MaximumExecutionFrequencyCloudTrail",
+            "MaximumExecutionFrequencyVpcFlowLogs",
+            "MaximumExecutionFrequencyCloudFormation",
+            "tag1Key"
+          ]
+        },
+        {
+          "Label": {
+            "default": "Optional"
+          },
+          "Parameters": [
+            "blacklistedPlatformType",
+            "requiredPlatformType",
+            "s3BucketNamesElbLogs",
+            "backupRetentionPeriod",
+            "preferredBackupWindow",
+            "checkReadReplicas",
+            "kmsKeyIdEbs",
+            "kmsKeyIdRds",
+            "expectedDeliveryWindowAge",
+            "s3BucketNameCloudTrail",
+            "snsTopicArnCloudTrail",
+            "cloudWatchLogsLogGroupArnCloudTrail",
+            "trafficType",
+            "kmsId",
+            "tag1Value",
+            "tag2Key",
+            "tag2Value",
+            "tag3Key",
+            "tag3Value",
+            "tag4Key",
+            "tag4Value",
+            "tag5Key",
+            "tag5Value",
+            "tag6Key",
+            "tag6Value"
+          ]
+        }
+      ]
+    }
+  },
+  "Conditions": {
+    "amiIds": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "amiIds"
+            }
+          ]
+        }
+      ]
+    },
+    "blacklistedApplicationNames": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "blacklistedApplicationNames"
+            }
+          ]
+        }
+      ]
+    },
+    "blacklistedPlatformType": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "blacklistedPlatformType"
+            }
+          ]
+        }
+      ]
+    },
+    "requiredApplicationNames": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "requiredApplicationNames"
+            }
+          ]
+        }
+      ]
+    },
+    "requiredPlatformType": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "requiredPlatformType"
+            }
+          ]
+        }
+      ]
+    },
+    "s3BucketNamesElbLogs": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "s3BucketNamesElbLogs"
+            }
+          ]
+        }
+      ]
+    },
+    "backupRetentionPeriod": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "backupRetentionPeriod"
+            }
+          ]
+        }
+      ]
+    },
+    "preferredBackupWindow": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "preferredBackupWindow"
+            }
+          ]
+        }
+      ]
+    },
+    "checkReadReplicas": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "checkReadReplicas"
+            }
+          ]
+        }
+      ]
+    },
+    "kmsKeyIdEbs": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "kmsKeyIdEbs"
+            }
+          ]
+        }
+      ]
+    },
+    "kmsKeyIdRds": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "kmsKeyIdRds"
+            }
+          ]
+        }
+      ]
+    },
+    "expectedDeliveryWindowAge": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "expectedDeliveryWindowAge"
+            }
+          ]
+        }
+      ]
+    },
+    "s3BucketNameCloudTrail": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "s3BucketNameCloudTrail"
+            }
+          ]
+        }
+      ]
+    },
+    "snsTopicArnCloudTrail": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "snsTopicArnCloudTrail"
+            }
+          ]
+        }
+      ]
+    },
+    "cloudWatchLogsLogGroupArnCloudTrail": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "cloudWatchLogsLogGroupArnCloudTrail"
+            }
+          ]
+        }
+      ]
+    },
+    "trafficType": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "trafficType"
+            }
+          ]
+        }
+      ]
+    },
+    "kmsId": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "kmsId"
+            }
+          ]
+        }
+      ]
+    },
+    "tag1Key": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag1Key"
+            }
+          ]
+        }
+      ]
+    },
+    "tag1Value": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag1Value"
+            }
+          ]
+        }
+      ]
+    },
+    "tag2Key": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag2Key"
+            }
+          ]
+        }
+      ]
+    },
+    "tag2Value": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag2Value"
+            }
+          ]
+        }
+      ]
+    },
+    "tag3Key": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag3Key"
+            }
+          ]
+        }
+      ]
+    },
+    "tag3Value": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag3Value"
+            }
+          ]
+        }
+      ]
+    },
+    "tag4Key": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag4Key"
+            }
+          ]
+        }
+      ]
+    },
+    "tag4Value": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag4Value"
+            }
+          ]
+        }
+      ]
+    },
+    "tag5Key": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag5Key"
+            }
+          ]
+        }
+      ]
+    },
+    "tag5Value": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag5Value"
+            }
+          ]
+        }
+      ]
+    },
+    "tag6Key": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag6Key"
+            }
+          ]
+        }
+      ]
+    },
+    "tag6Value": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            "",
+            {
+              "Ref": "tag6Value"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

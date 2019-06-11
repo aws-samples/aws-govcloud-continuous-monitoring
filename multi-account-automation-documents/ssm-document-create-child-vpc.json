@@ -1,0 +1,54 @@
+{
+  "description": "Automation Document Example JSON Template",
+  "schemaVersion": "0.3",
+  "parameters": {
+    "pS3Bucket": {
+      "type": "String",
+      "description": "(Required) S3 bucket name for the CloudFormation template(s)"
+    },
+    "pS3KeyPrefix": {
+      "type": "String",
+      "description": "(Required) S3 key prefix for the CloudFormation template(s)",
+      "default": ""
+    },
+    "pVpcName": {
+      "type": "String",
+      "description": "(Required) VPC Name"
+    },
+    "pVpcCidr": {
+      "type": "String",
+      "description": "(Required) VPC CIDR block"
+    },
+    "Dummy": {
+      "type": "String",
+      "description": "Dummy parameter",
+      "default": ""
+    }
+  },
+  "mainSteps": [
+    {
+      "name": "makeStack",
+      "action": "aws:createStack",
+      "maxAttempts": 1,
+      "onFailure": "Abort",
+      "inputs": {
+        "Capabilities": [
+          "CAPABILITY_NAMED_IAM"
+        ],
+        "StackName": "vpc-{{pVpcName}}",
+        "Parameters": [
+          {
+            "ParameterKey": "pVpcName",
+            "ParameterValue": "{{pVpcName}}"
+          },
+          {
+            "ParameterKey": "pVpcCidr",
+            "ParameterValue": "{{pVpcCidr}}"
+          }
+        ],
+        "TemplateURL": "https://{{pS3Bucket}}.s3-us-gov-west-1.amazonaws.com/{{pS3KeyPrefix}}main.template",
+        "TimeoutInMinutes": 30
+      }
+    }
+  ]
+}

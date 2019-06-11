@@ -1,0 +1,31 @@
+[
+  {
+    "ParameterKey": "pSupportingFilesPrefix",
+    "ParameterValue": "my-s3-prefix/"
+  },
+  {
+    "ParameterKey": "pSupportingFilesBucket",
+    "ParameterValue": "my-s3-bucket"
+  },
+  {
+    "ParameterKey": "pJiraUsername",
+    "ParameterValue": "my-jira-user"
+  },
+  {
+    "ParameterKey": "pJiraUrl",
+    "ParameterValue": "https://my-project.atlassian.net"
+  },
+  {
+    "ParameterKey": "pJiraProjectKey",
+    "ParameterValue": "ABC"
+  },
+  {
+    "ParameterKey": "pJiraPasswordParameterName",
+    "ParameterValue": "jira-password"
+  },
+  {
+    "ParameterKey": "pJiraIssueTypeName",
+    "ParameterValue": "Story"
+  }
+]
+
