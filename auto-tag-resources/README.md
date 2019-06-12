@@ -8,11 +8,11 @@
 
 Usage
 ```
-aws cloudformation create-stack --stack-name <my-stack-name> --template-body file://auto-tag-resource.json --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name <my-stack-name> --template-body file://auto-tag-resource.json --capabilities CAPABILITY_NAMED_IAM --parameters ParameterKey=pSupportingFilesBucket,ParameterValue=<my-bucket> ParameterKey=pSupportingFilesPrefix,ParameterValue=<my-prefix>
 ```
 Example
 ```
-aws cloudformation create-stack --stack-name auto-tag-resources --template-body file://auto-tag-resources.json --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name auto-tag-resources --template-body file://auto-tag-resources.json --capabilities CAPABILITY_NAMED_IAM  --parameters ParameterKey=pSupportingFilesBucket,ParameterValue=my-s3-bucket ParameterKey=pSupportingFilesPrefix,ParameterValue=my-s3-prefix/
 ```
 ### 2. Find an AMI
 
