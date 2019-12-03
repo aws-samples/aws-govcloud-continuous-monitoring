@@ -1,8 +1,14 @@
+## How-To Video
+
+[![Watch the video](https://img.youtube.com/vi/iQyqKmiIJyo/maxresdefault.jpg)](https://youtu.be/iQyqKmiIJyo)
+
 ## Prerequisites
 
 1. CloudFormation templates (identify-unmanaged-configuration-changes-infrastructure.json) is uploaded to S3 bucket
 
-## Usage
+## Steps
+
+### 1. Create the CloudFormation stack:
 
 Example parameters.json:
 ```
@@ -21,38 +27,38 @@ Example parameters.json:
   }
 ]
 ```
-Create the CloudFormation stack:
+Usage
 ```
 aws cloudformation create-stack --stack-name <my-stack-name> --template-body file://identify-unmanaged-configuration-changes-toplevel.json --parameters file://parameters.json --capabilities CAPABILITY_NAMED_IAM
 ```
+Example
+```
+aws cloudformation create-stack --stack-name identify-unmanaged-configuration-changes --template-body file://identify-unmanaged-configuration-changes-toplevel.json --parameters file://parameters.json --capabilities CAPABILITY_NAMED_IAM
+```
 
-Confirm the email subscription to the SNS topic
+### 2. Confirm subscription to the SNS Topic using the link provided via email
 
-## Test Steps
-
-### 1. Confirm subscription to the SNS Topic using the link provided via email
-
-### 2. Using the EC2 console, change the security group created by CloudFormation
+### 3. Using the EC2 console, change the security group created by CloudFormation
 
 For example, change the inbound-ssh rule from 1.2.3.4/32 to 5.6.7.8/32
 
-### 3. Using the Config console, confirm the config rule ending in verify-security-groups-cfn evaluated the security group as NON_COMPLIANT
+### 4. Using the Config console, confirm the config rule ending in verify-security-groups-cfn evaluated the security group as NON_COMPLIANT
 
-### 4. Confirm email notification was received of the non-compliant config rule
+### 5. Confirm email notification was received of the non-compliant config rule
 
-### 5. Using the EC2 console, revert the security group to its original value
+### 6. Using the EC2 console, revert the security group to its original value
 
 For example, change the inbound-ssh rule from 5.6.7.8/32 to 1.2.3.4/32
 
-### 6. Using the Config console, confirm the config rule ending in verify-security-groups-cfn evaluated the security group as COMPLIANT
+### 7. Using the Config console, confirm the config rule ending in verify-security-groups-cfn evaluated the security group as COMPLIANT
 
-### 7. Using the CloudFormation console, update the pAllowedBastionCidrBlock parameter
+### 8. Using the CloudFormation console, update the pAllowedBastionCidrBlock parameter
 
 For example, change the pAllowedBastionCidrBlock parameter from 1.2.3.4/32 to 9.10.11.12/32 
 
-### 8. Using the Config console, confirm the config rule ending in verify-security-groups-cfn evaluated the security group as COMPLIANT
+### 9. Using the Config console, confirm the config rule ending in verify-security-groups-cfn evaluated the security group as COMPLIANT
 
-### 9. Confirm email notification was received of the compliant config rule
+### 10. Confirm email notification was received of the compliant config rule
 
 ## Notes
 

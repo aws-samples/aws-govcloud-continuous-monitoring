@@ -1,8 +1,12 @@
+## How-To Video
+
+[![Watch the video](https://img.youtube.com/vi/oGvdNublBKg/maxresdefault.jpg)](https://youtu.be/oGvdNublBKg)
+
 ## Prerequisites
 
 1. Lambda function (auto-tag-resources.zip) is uploaded to S3 bucket
 
-## Test Steps
+## Steps
 
 ### 1. Create the CloudFormation stack
 
@@ -18,11 +22,11 @@ aws cloudformation create-stack --stack-name auto-tag-resources --template-body 
 
 Usage
 ```
-aws ssm get-parameters --names /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2 --region <my-aws-region> --query Parameters[0].[Value] --profile <my-profile>
+aws ssm get-parameters --names /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2 --region <my-aws-region> --query Parameters[0].[Value]
 ```
 Example
 ```
-aws ssm get-parameters --names /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2 --region us-gov-west-1 --query Parameters[0].[Value] --profile child
+aws ssm get-parameters --names /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2 --region us-gov-west-1 --query Parameters[0].[Value]
 [
     "ami-6aa7db0b"
 ]
@@ -37,4 +41,4 @@ Example
 ```
 aws ec2 run-instances --image-id ami-6aa7db0b --count 1 --instance-type m4.large 
 ```
-### 3. Confirm the EC2 instance has an "Owner" tag
+### 4. Confirm the EC2 instance has an "Owner" tag

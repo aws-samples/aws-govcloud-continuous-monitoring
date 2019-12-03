@@ -1,3 +1,7 @@
+## How-To Video
+
+[![Watch the video](https://img.youtube.com/vi/0rymMbEYNiY/maxresdefault.jpg)](https://youtu.be/0rymMbEYNiY)
+
 ## Prerequisites
 
 None

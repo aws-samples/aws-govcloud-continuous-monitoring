@@ -1,8 +1,14 @@
+## How-To Video
+
+[![Watch the video](https://img.youtube.com/vi/9OLB4d9Kctk/maxresdefault.jpg)](https://youtu.be/9OLB4d9Kctk)
+
 ## Prerequisites
 
 None
 
-## Usage
+## Steps
+
+### 1. Create the CloudFormation stack
 
 Example parameters.json:
 ```
@@ -17,9 +23,6 @@ Example parameters.json:
   }
 ]
 ```
-Create the CloudFormation stack:
-
-### 1. Create the CloudFormation stack
 
 Usage
 ```
@@ -29,7 +32,6 @@ Example
 ```
 aws cloudformation create-stack --stack-name alert-on-protected-actions --template-body file://alert-on-protected-actions.json --parameters file://parameters.json --capabilities CAPABILITY_NAMED_IAM
 ```
-## Test Steps
 
 ### 2. Confirm subscription to the SNS Topic using the link provided via email
 

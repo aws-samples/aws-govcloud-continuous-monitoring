@@ -2,6 +2,10 @@
 This solution enables VPC flow logs for a given VPC and pushes them to ElasticSearch.
 Kibana is then used to visualize the injested VPC flow logs
 
+## How-To Video
+
+[![Watch the video](https://img.youtube.com/vi/j4UpXDhqK6M/maxresdefault.jpg)](https://youtu.be/j4UpXDhqK6M)
+
 ## Prerequisites
 An existing VPC
 

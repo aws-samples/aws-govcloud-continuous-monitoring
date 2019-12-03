@@ -1,10 +1,16 @@
+## How-To Video
+
+[![Watch the video](https://img.youtube.com/vi/jV7lLq9GwbI/maxresdefault.jpg)](https://youtu.be/jV7lLq9GwbI)
+
 ## Prerequisites
 
 1. Systems Manager Parameter Store Parameter specified in CloudFormation parameter `pJiraPasswordParameterName` contains the Jira password for the user specified in the CloudFormation parameter `pJiraUsername`
 
 2. [Default Encryption for New EBS Volumes](https://aws.amazon.com/blogs/aws/new-opt-in-to-default-encryption-for-new-ebs-volumes/) is NOT turned on
 
-## Usage
+## Steps
+
+### 1. Create the CloudFormation stack:
 
 Example parameters.json:
 ```
@@ -39,14 +45,16 @@ Example parameters.json:
   }
 ]
 ```
-Create the CloudFormation stack:
+Usage
 ```
 aws cloudformation create-stack --stack-name <my-stack-name> --template-body file://create-jira-issues.json --parameters file://parameters.json --capabilities CAPABILITY_NAMED_IAM
 ```
+Example
+```
+aws cloudformation create-stack --stack-name create-jira-issues --template-body file://create-jira-issues.json --parameters file://parameters.json --capabilities CAPABILITY_NAMED_IAM
+```
 
-## Test Steps
-
-### 1. Find an unencrypted AMI
+### 2. Find an unencrypted AMI
 
 Usage
 ```
@@ -59,7 +67,7 @@ aws ssm get-parameters --names /aws/service/ami-amazon-linux-latest/amzn2-ami-hv
     "ami-6aa7db0b"
 ]
 ```
-### 2. Create an EC2 instance with an unencrypted EBS Volume from the AMI found in step 1
+### 3. Create an EC2 instance with an unencrypted EBS Volume from the AMI found in step 1
 
 Usage
 ```
@@ -70,7 +78,7 @@ Example
 aws ec2 run-instances --image-id ami-6aa7db0b --count 1 --instance-type m4.large
 ```
 
-### 3. Open Jira and confirm an issue was created
+### 4. Open Jira and confirm an issue was created
 
 > EBS Volume vol-123 is unencrypted
 > 

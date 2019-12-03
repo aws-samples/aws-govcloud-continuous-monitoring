@@ -1,8 +1,14 @@
+## How-To Video
+
+[![Watch the video](https://img.youtube.com/vi/w-vQmbkuIig/maxresdefault.jpg)](https://youtu.be/w-vQmbkuIig)
+
 ## Prerequisites
 
 None
 
-## Usage
+## Steps
+
+### 1. Create the CloudFormation stack:
 
 Example parameters.json:
 ```
@@ -25,16 +31,13 @@ Example parameters.json:
   }
 ]
 ```
-Create the CloudFormation stack:
 Usage
 ```
 aws cloudformation create-stack --stack-name <my-stack-name> --template-body file://managed-config-rules.json --parameters file://parameters.json
 ```
-Usage
+Example
 ```
 aws cloudformation create-stack --stack-name managed-config-rules --template-body file://managed-config-rules.json --parameters file://parameters.json
 ```
 
-## Test Steps
-
-### 1. Modify resources and observe changes to compliance status
+### 2. Modify resources and observe changes to compliance status
